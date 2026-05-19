@@ -77,6 +77,19 @@ class FaceVerifyModule(reactContext: ReactApplicationContext) :
     }.start()
   }
 
+  @ReactMethod
+  fun readAsBase64(imagePath: String, promise: Promise) {
+    Thread {
+      try {
+        val cleanPath = imagePath.removePrefix("file://")
+        val bytes = java.io.File(cleanPath).readBytes()
+        promise.resolve(android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
+      } catch (e: Exception) {
+        promise.reject("READ_ERROR", "Could not read file at path: $imagePath — ${e.message}")
+      }
+    }.start()
+  }
+
   // MARK: - Brightness (luminance average, sampled)
 
   private fun averageBrightness(bitmap: android.graphics.Bitmap): Double {

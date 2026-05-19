@@ -131,5 +131,21 @@ class FaceVerifyModule: NSObject {
     0.299 * Double(data[i]) + 0.587 * Double(data[i + 1]) + 0.114 * Double(data[i + 2])
   }
 
+  @objc
+  func readAsBase64(
+    _ imagePath: String,
+    resolver resolve: @escaping RCTPromiseResolveBlock,
+    rejecter reject: @escaping RCTPromiseRejectBlock
+  ) {
+    DispatchQueue.global(qos: .userInitiated).async {
+      let path = imagePath.hasPrefix("file://") ? String(imagePath.dropFirst(7)) : imagePath
+      guard let data = FileManager.default.contents(atPath: path) else {
+        reject("READ_ERROR", "Could not read file at path: \(path)", nil)
+        return
+      }
+      resolve(data.base64EncodedString())
+    }
+  }
+
   @objc static func requiresMainQueueSetup() -> Bool { false }
 }

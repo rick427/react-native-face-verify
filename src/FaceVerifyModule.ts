@@ -3,6 +3,7 @@ import { NativeModules } from 'react-native';
 const { FaceVerifyModule: Native } = NativeModules as {
   FaceVerifyModule?: {
     checkQuality: (imagePath: string) => Promise<QualityResult>;
+    readAsBase64: (imagePath: string) => Promise<string>;
   };
 };
 
@@ -24,4 +25,15 @@ export function checkImageQuality(imagePath: string): Promise<QualityResult> {
     return Promise.resolve({ passed: false, reason: 'no_face' });
   }
   return Native.checkQuality(imagePath);
+}
+
+export function readPhotoAsBase64(imagePath: string): Promise<string> {
+  if (!Native) {
+    return Promise.reject(
+      new Error(
+        "[FaceVerify] Native module not found. Run 'pod install' (iOS) or rebuild (Android)."
+      )
+    );
+  }
+  return Native.readAsBase64(imagePath);
 }

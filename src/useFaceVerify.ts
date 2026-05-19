@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import type { Camera } from 'react-native-vision-camera';
 import { compareFacesWithRekognition } from './awsRekognition';
+import { readPhotoAsBase64 } from './FaceVerifyModule';
 import type {
   AwsConfig,
   EndpointConfig,
@@ -19,32 +20,6 @@ type Options = {
   onNoMatch: (result: VerifyResult) => void;
   onError?: (error: Error) => void;
 };
-
-// ─── Base64 helper ─────────────────────────────────────────────────────────────
-function photoToBase64(path: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', `file://${path}`, true);
-    xhr.responseType = 'blob';
-    xhr.onload = () => {
-      const blob: Blob = xhr.response;
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          resolve(reader.result.split(',')[1] ?? reader.result);
-        } else {
-          reject(new Error('[FaceVerify] Could not read captured photo.'));
-        }
-      };
-      reader.onerror = () =>
-        reject(new Error('[FaceVerify] Could not read captured photo.'));
-      reader.readAsDataURL(blob);
-    };
-    xhr.onerror = () =>
-      reject(new Error('[FaceVerify] Could not load photo from disk.'));
-    xhr.send();
-  });
-}
 
 // ─── Comparison dispatcher ─────────────────────────────────────────────────────
 async function runComparison(
@@ -136,7 +111,7 @@ export function useFaceVerify(options: Options) {
       setState('comparing');
       setFeedback('Verifying identity...');
 
-      const capturedImage = await photoToBase64(photo.path);
+      const capturedImage = await readPhotoAsBase64(photo.path);
       const { match, similarity } = await runComparison(
         referenceImage,
         capturedImage,

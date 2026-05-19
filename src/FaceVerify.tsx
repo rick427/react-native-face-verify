@@ -180,31 +180,35 @@ function CircleOverlay({
         strokeWidth={1}
       />
 
-      {/* Ripple rings — expand outward during 'comparing' */}
-      <AnimatedCircle
-        cx={cx}
-        cy={cy}
-        fill="none"
-        stroke="#FFFFFF"
-        strokeWidth={STROKE_WIDTH}
-        animatedProps={rp1}
-      />
-      <AnimatedCircle
-        cx={cx}
-        cy={cy}
-        fill="none"
-        stroke="#FFFFFF"
-        strokeWidth={STROKE_WIDTH}
-        animatedProps={rp2}
-      />
-      <AnimatedCircle
-        cx={cx}
-        cy={cy}
-        fill="none"
-        stroke="#FFFFFF"
-        strokeWidth={STROKE_WIDTH}
-        animatedProps={rp3}
-      />
+      {/* Ripple rings — only mounted during 'comparing' */}
+      {state === 'comparing' && (
+        <>
+          <AnimatedCircle
+            cx={cx}
+            cy={cy}
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth={STROKE_WIDTH}
+            animatedProps={rp1}
+          />
+          <AnimatedCircle
+            cx={cx}
+            cy={cy}
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth={STROKE_WIDTH}
+            animatedProps={rp2}
+          />
+          <AnimatedCircle
+            cx={cx}
+            cy={cy}
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth={STROKE_WIDTH}
+            animatedProps={rp3}
+          />
+        </>
+      )}
 
       {/* Rotating corner brackets */}
       <AnimatedG animatedProps={bracketAnimProps}>
@@ -429,16 +433,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   countdownBubble: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: 'rgba(255,255,255,0.15)',
     borderWidth: 2,
     borderColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  countdownText: { color: '#fff', fontSize: 52, lineHeight: 60 },
+  countdownText: { color: '#fff', fontSize: 36, lineHeight: 44 },
   captureFlash: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#fff',

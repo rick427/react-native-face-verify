@@ -97,8 +97,6 @@ export function useFaceVerify(options: Options) {
 
   const stateRef = useRef<FaceVerifyState>('ready');
   const isCaptured = useRef(false);
-  const qualityRetries = useRef(0);
-  const MAX_QUALITY_RETRIES = 2;
 
   const setState = useCallback((next: FaceVerifyState) => {
     stateRef.current = next;
@@ -124,37 +122,15 @@ export function useFaceVerify(options: Options) {
       const quality = await checkImageQuality(photo.path);
 
       if (!quality.passed) {
-        qualityRetries.current += 1;
-
-        if (qualityRetries.current > MAX_QUALITY_RETRIES) {
-          // Too many failed quality checks — surface as an error and stop
-          qualityRetries.current = 0;
-          setState('error');
-          setFeedback('');
-          onError?.(
-            new Error(
-              `[FaceVerify] Image quality check failed repeatedly: ${quality.reason ?? 'unknown'}`
-            )
-          );
-          return;
-        }
-
-        const msg: FeedbackMessage =
-          quality.reason === 'too_dark'
-            ? 'Too dark — move to better lighting'
-            : 'Image unclear, trying again...';
-        setFeedback(msg);
-
-        setTimeout(() => {
-          isCaptured.current = false;
-          setState('ready');
-          setFeedback('Position your face in the circle');
-          startCountdownRef.current();
-        }, 2000);
+        setState('error');
+        setFeedback('');
+        onError?.(
+          new Error(
+            `[FaceVerify] Image quality check failed: ${quality.reason ?? 'unknown'}`
+          )
+        );
         return;
       }
-
-      qualityRetries.current = 0;
 
       // Compare
       const capturedImage = await photoToBase64(photo.path);

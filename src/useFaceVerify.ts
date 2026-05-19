@@ -49,7 +49,11 @@ async function runComparison(
   endpoint?: EndpointConfig
 ): Promise<{ match: boolean; similarity: number }> {
   if (awsConfig) {
-    return compareFacesWithRekognition(awsConfig, referenceImage, capturedImage);
+    return compareFacesWithRekognition(
+      awsConfig,
+      referenceImage,
+      capturedImage
+    );
   }
   if (endpoint) {
     const response = await fetch(endpoint.url, {
@@ -59,11 +63,15 @@ async function runComparison(
     });
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`[FaceVerify] Endpoint error ${response.status}: ${text}`);
+      throw new Error(
+        `[FaceVerify] Endpoint error ${response.status}: ${text}`
+      );
     }
     return response.json() as Promise<{ match: boolean; similarity: number }>;
   }
-  throw new Error('[FaceVerify] Either `awsConfig` or `endpoint` must be provided.');
+  throw new Error(
+    '[FaceVerify] Either `awsConfig` or `endpoint` must be provided.'
+  );
 }
 
 // ─── Hook ──────────────────────────────────────────────────────────────────────
@@ -80,7 +88,8 @@ export function useFaceVerify(options: Options) {
     onError,
   } = options;
 
-  const [faceVerifyState, setFaceVerifyState] = useState<FaceVerifyState>('ready');
+  const [faceVerifyState, setFaceVerifyState] =
+    useState<FaceVerifyState>('ready');
   const [feedback, setFeedback] = useState<FeedbackMessage>(
     'Position your face in the circle'
   );
@@ -124,7 +133,7 @@ export function useFaceVerify(options: Options) {
           isCaptured.current = false;
           setState('ready');
           setFeedback('Position your face in the circle');
-          startCountdown();
+          startCountdownRef.current();
         }, 2000);
         return;
       }
@@ -159,7 +168,17 @@ export function useFaceVerify(options: Options) {
       setFeedback('');
       onError?.(err instanceof Error ? err : new Error(String(err)));
     }
-  }, [cameraRef, soundEnabled, referenceImage, awsConfig, endpoint, onMatch, onNoMatch, onError, setState]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    cameraRef,
+    soundEnabled,
+    referenceImage,
+    awsConfig,
+    endpoint,
+    onMatch,
+    onNoMatch,
+    onError,
+    setState,
+  ]);
 
   // ── Countdown ─────────────────────────────────────────────────────────────────
   // Defined with useRef so capture can reference it without stale closures.
@@ -200,7 +219,7 @@ export function useFaceVerify(options: Options) {
   useEffect(() => {
     const timer = setTimeout(() => startCountdownRef.current(), 1200);
     return () => clearTimeout(timer);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return { faceVerifyState, feedback, countdown };
 }

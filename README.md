@@ -1,5 +1,12 @@
 # @rick427/react-native-face-verify
 
+[![npm version](https://img.shields.io/npm/v/@rick427/react-native-face-verify?color=4CAF50&style=flat-square)](https://www.npmjs.com/package/@rick427/react-native-face-verify)
+[![npm downloads](https://img.shields.io/npm/dm/@rick427/react-native-face-verify?style=flat-square)](https://www.npmjs.com/package/@rick427/react-native-face-verify)
+[![license](https://img.shields.io/npm/l/@rick427/react-native-face-verify?style=flat-square)](LICENSE)
+[![platforms](https://img.shields.io/badge/platforms-iOS%20%7C%20Android-lightgrey?style=flat-square)](https://github.com/rick427/react-native-face-verify)
+[![vision camera](https://img.shields.io/badge/vision--camera-v4-blue?style=flat-square)](https://github.com/mrousavy/react-native-vision-camera)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+
 Face verification library for React Native. Opens the front camera, runs real-time ML Kit quality checks, auto-captures when the image is sharp and well-positioned, then compares the capture against a reference image via **AWS Rekognition** or **your own backend endpoint**.
 
 Same design language as [`@rick427/react-native-liveness`](https://github.com/rick427/react-native-liveness) — SVG circle overlay, rotating corner brackets, progress arc, countdown bubble.

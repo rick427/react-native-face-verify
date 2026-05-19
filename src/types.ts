@@ -45,16 +45,17 @@ export type FaceVerifyProps = {
   referenceImage: string;
 
   /**
-   * When provided, calls AWS Rekognition CompareFaces directly.
-   * Takes priority over `endpoint` if both are supplied.
+   * Calls AWS Rekognition CompareFaces directly from the device.
+   * Only used when `endpoint` is not supplied.
    *
-   * WARNING: Do not ship real IAM credentials in a public app.
+   * ⚠️  FOR LOCAL TESTING ONLY — never ship real IAM credentials in a
+   * production app. Use `endpoint` instead and keep credentials on your server.
    */
   awsConfig?: AwsConfig;
 
   /**
-   * When provided (and `awsConfig` is absent), POSTs both images to
-   * your backend which proxies the comparison service.
+   * POSTs both images to your backend which proxies the comparison service.
+   * Takes priority over `awsConfig` when both are supplied.
    *
    * Expected POST body: `{ referenceImage: string, capturedImage: string }`
    * Expected response:  `{ match: boolean, similarity: number }`

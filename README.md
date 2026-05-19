@@ -155,15 +155,15 @@ const { faceVerifyState, feedback, countdown } = useFaceVerify({
 
 ## Comparison paths
 
-### Path A — Your backend (recommended)
+### Path A — Your backend (recommended for production)
 
-Pass an `endpoint` object. The library POSTs both images to your server, which proxies the comparison service (AWS, Azure, DeepFace, etc). Credentials never touch the device.
+Pass an `endpoint` object. The library POSTs both images to your server, which proxies the comparison service (AWS Rekognition, Azure Face, DeepFace, etc). Your IAM credentials stay on the server and never touch the device.
 
 ```tsx
 <FaceVerifyModal
   referenceImage={base64}
   endpoint={{
-    url: 'https://api.yourserver.com/compare',
+    url: 'https://api.yourserver.com/compare-faces',
     headers: { Authorization: `Bearer ${token}` },
   }}
   onMatch={...}
@@ -181,18 +181,28 @@ Pass an `endpoint` object. The library POSTs both images to your server, which p
 { "match": true, "similarity": 98.5 }
 ```
 
+When both `endpoint` and `awsConfig` are supplied, **`endpoint` always takes priority**.
+
 ---
 
-### Path B — AWS Rekognition direct (escape hatch)
+### Path B — AWS Rekognition direct (local testing only)
 
-Pass `awsConfig`. The library calls `CompareFaces` directly using pure-JS AWS Signature V4 signing — no AWS SDK required.
+> ### 🚨 WARNING — DO NOT USE IN PRODUCTION
+>
+> `awsConfig` embeds your AWS Access Key ID and Secret Access Key directly
+> inside the app bundle. Anyone who decompiles your app can extract these
+> credentials and use them to rack up charges or access your AWS account.
+>
+> **This path exists only for local development and testing.**
+> Before you ship to the App Store or Play Store, switch to Path A and
+> move your credentials to a backend server.
 
 ```tsx
 <FaceVerifyModal
   referenceImage={base64}
   awsConfig={{
-    accessKeyId: 'AKIA...',
-    secretAccessKey: '...',
+    accessKeyId: 'AKIA...',       // ← never commit or ship these
+    secretAccessKey: '...',       // ← never commit or ship these
     region: 'us-east-1',
     similarityThreshold: 80,
   }}
@@ -201,9 +211,7 @@ Pass `awsConfig`. The library calls `CompareFaces` directly using pure-JS AWS Si
 />
 ```
 
-> **Warning:** Do not ship real IAM credentials in a public app. Use this only for internal/MDM-managed applications. For public apps, use Path A and keep credentials on your server.
-
-When `awsConfig` is provided, it takes priority over `endpoint`.
+The library calls `CompareFaces` directly using pure-JS AWS Signature V4 signing — no AWS SDK required. Only used when `endpoint` is not provided.
 
 ---
 

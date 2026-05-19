@@ -48,13 +48,6 @@ async function runComparison(
   awsConfig?: AwsConfig,
   endpoint?: EndpointConfig
 ): Promise<{ match: boolean; similarity: number }> {
-  if (awsConfig) {
-    return compareFacesWithRekognition(
-      awsConfig,
-      referenceImage,
-      capturedImage
-    );
-  }
   if (endpoint) {
     const response = await fetch(endpoint.url, {
       method: 'POST',
@@ -68,6 +61,13 @@ async function runComparison(
       );
     }
     return response.json() as Promise<{ match: boolean; similarity: number }>;
+  }
+  if (awsConfig) {
+    return compareFacesWithRekognition(
+      awsConfig,
+      referenceImage,
+      capturedImage
+    );
   }
   throw new Error(
     '[FaceVerify] Either `awsConfig` or `endpoint` must be provided.'

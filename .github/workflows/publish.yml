@@ -8,6 +8,8 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    env:
+      YARN_ENABLE_IMMUTABLE_INSTALLS: false
     steps:
       - uses: actions/checkout@v4
 
@@ -19,7 +21,7 @@ jobs:
         run: corepack enable
 
       - name: Install dependencies
-        run: yarn install --immutable
+        run: yarn install
 
       - name: Lint
         run: yarn lint
@@ -30,6 +32,8 @@ jobs:
   publish:
     needs: lint
     runs-on: ubuntu-latest
+    env:
+      YARN_ENABLE_IMMUTABLE_INSTALLS: false
     steps:
       - uses: actions/checkout@v4
 
@@ -42,7 +46,7 @@ jobs:
         run: corepack enable
 
       - name: Install dependencies
-        run: yarn install --immutable
+        run: yarn install
 
       - name: Build
         run: yarn prepare

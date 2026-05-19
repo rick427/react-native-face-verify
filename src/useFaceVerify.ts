@@ -215,5 +215,14 @@ export function useFaceVerify(options: Options) {
     return () => clearTimeout(timer);
   }, []);
 
-  return { faceVerifyState, feedback, countdown };
+  // ── Retry after error ─────────────────────────────────────────────────────────
+  const retry = useCallback(() => {
+    if (stateRef.current !== 'error') return;
+    isCaptured.current = false;
+    setState('ready');
+    setFeedback('Position your face in the circle');
+    setTimeout(() => startCountdownRef.current(), 800);
+  }, [setState]);
+
+  return { faceVerifyState, feedback, countdown, retry };
 }

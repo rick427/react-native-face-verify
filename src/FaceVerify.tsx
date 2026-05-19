@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated as RNAnimated, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated as RNAnimated,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -306,7 +312,7 @@ export function FaceVerify({
   const cameraRef = useRef<Camera>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
-  const { faceVerifyState, feedback, countdown } = useFaceVerify({
+  const { faceVerifyState, feedback, countdown, retry } = useFaceVerify({
     referenceImage,
     awsConfig,
     endpoint,
@@ -397,6 +403,17 @@ export function FaceVerify({
       {faceVerifyState === 'capturing' && (
         <View style={styles.captureFlash} pointerEvents="none" />
       )}
+      {faceVerifyState === 'error' && (
+        <View style={styles.retryContainer}>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={retry}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.retryText, { fontFamily }]}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -447,5 +464,25 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#fff',
     opacity: 0.4,
+  },
+  retryContainer: {
+    position: 'absolute',
+    bottom: '12%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  retryButton: {
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
+  retryText: {
+    color: '#fff',
+    fontSize: 15,
+    textAlign: 'center',
   },
 });

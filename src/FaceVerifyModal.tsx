@@ -52,7 +52,6 @@ export function FaceVerifyModal({
   onMatch,
   onNoMatch,
   onError,
-  countdownFrom,
   soundEnabled,
   fontFamily,
 }: FaceVerifyModalProps) {
@@ -72,7 +71,6 @@ export function FaceVerifyModal({
           onMatch={onMatch}
           onNoMatch={onNoMatch}
           onError={onError}
-          countdownFrom={countdownFrom}
           soundEnabled={soundEnabled}
           fontFamily={fontFamily}
         />

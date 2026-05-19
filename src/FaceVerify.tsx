@@ -1,11 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Animated as RNAnimated,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useCallback, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -22,6 +16,7 @@ import {
   useCameraPermission,
 } from 'react-native-vision-camera';
 import { Circle, Defs, G, Path, Svg } from 'react-native-svg';
+import { useEffect } from 'react';
 import { useFaceVerify } from './useFaceVerify';
 import type { FaceVerifyProps, FaceVerifyState } from './types';
 
@@ -120,7 +115,6 @@ function CircleOverlay({
   const rp2 = makeRippleProps(ripple2);
   const rp3 = makeRippleProps(ripple3);
 
-  // Bracket rotation — runs always, freezes on terminal states
   useEffect(() => {
     bracketRot.value = withRepeat(
       withTiming(360, { duration: 6000, easing: Easing.linear }),
@@ -157,7 +151,7 @@ function CircleOverlay({
     } else {
       ripples.forEach((sv) => {
         cancelAnimation(sv);
-        sv.value = withTiming(0, { duration: 150 });
+        sv.value = 0;
       });
     }
   }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -241,57 +235,6 @@ function CircleOverlay({
   );
 }
 
-// ─── CountdownBubble ──────────────────────────────────────────────────────────
-function CountdownBubble({
-  value,
-  fontFamily,
-}: {
-  value: number;
-  fontFamily: string;
-}) {
-  const scale = useRef(new RNAnimated.Value(0)).current;
-  const opacity = useRef(new RNAnimated.Value(0)).current;
-
-  useEffect(() => {
-    RNAnimated.parallel([
-      RNAnimated.sequence([
-        RNAnimated.spring(scale, {
-          toValue: 1.2,
-          stiffness: 200,
-          damping: 6,
-          useNativeDriver: true,
-        }),
-        RNAnimated.spring(scale, {
-          toValue: 1.0,
-          stiffness: 150,
-          damping: 8,
-          useNativeDriver: true,
-        }),
-      ]),
-      RNAnimated.timing(opacity, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    return () => {
-      RNAnimated.timing(opacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return (
-    <RNAnimated.View
-      style={[styles.countdownBubble, { opacity, transform: [{ scale }] }]}
-    >
-      <Text style={[styles.countdownText, { fontFamily }]}>{value}</Text>
-    </RNAnimated.View>
-  );
-}
-
 // ─── FaceVerify ───────────────────────────────────────────────────────────────
 export function FaceVerify({
   referenceImage,
@@ -300,7 +243,6 @@ export function FaceVerify({
   onMatch,
   onNoMatch,
   onError,
-  countdownFrom = 3,
   soundEnabled = true,
   fontFamily = DEFAULT_FONT,
   style,
@@ -309,16 +251,15 @@ export function FaceVerify({
   const device = useCameraDevice('front');
   const format = useCameraFormat(device, [{ fps: 60 }]);
   const fps = Math.min(format?.maxFps ?? 30, 60);
-  const cameraRef = useRef<Camera>(null);
+  const cameraRef = useState(() => ({ current: null as Camera | null }))[0];
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
-  const { faceVerifyState, feedback, countdown, retry } = useFaceVerify({
+  const { faceVerifyState, feedback, capture, retry } = useFaceVerify({
     referenceImage,
     awsConfig,
     endpoint,
-    countdownFrom,
     soundEnabled,
-    cameraRef,
+    cameraRef: cameraRef as React.RefObject<Camera | null>,
     onMatch,
     onNoMatch,
     onError,
@@ -368,7 +309,9 @@ export function FaceVerify({
   return (
     <View style={[styles.root, style]} onLayout={handleLayout}>
       <Camera
-        ref={cameraRef}
+        ref={(ref) => {
+          (cameraRef as React.MutableRefObject<Camera | null>).current = ref;
+        }}
         style={StyleSheet.absoluteFill}
         device={device}
         isActive={isCameraActive}
@@ -382,6 +325,8 @@ export function FaceVerify({
         height={containerSize.height}
         state={faceVerifyState}
       />
+
+      {/* Feedback text */}
       {faceVerifyState !== 'capturing' &&
         faceVerifyState !== 'comparing' &&
         feedback.length > 0 && (
@@ -391,18 +336,26 @@ export function FaceVerify({
             </Text>
           </View>
         )}
-      {faceVerifyState === 'ready' && countdown !== null && (
-        <View style={styles.countdownContainer}>
-          <CountdownBubble
-            key={countdown}
-            value={countdown}
-            fontFamily={fontFamily}
-          />
+
+      {/* Shutter button — tap to capture */}
+      {faceVerifyState === 'ready' && (
+        <View style={styles.shutterContainer}>
+          <TouchableOpacity
+            style={styles.shutterRing}
+            onPress={capture}
+            activeOpacity={0.75}
+          >
+            <View style={styles.shutterInner} />
+          </TouchableOpacity>
         </View>
       )}
+
+      {/* Capture flash */}
       {faceVerifyState === 'capturing' && (
         <View style={styles.captureFlash} pointerEvents="none" />
       )}
+
+      {/* Retry button */}
       {faceVerifyState === 'error' && (
         <View style={styles.retryContainer}>
           <TouchableOpacity
@@ -430,7 +383,7 @@ const styles = StyleSheet.create({
   },
   feedbackContainer: {
     position: 'absolute',
-    bottom: '12%',
+    bottom: '22%',
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -444,22 +397,28 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
-  countdownContainer: {
-    ...StyleSheet.absoluteFillObject,
+  shutterContainer: {
+    position: 'absolute',
+    bottom: '8%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  shutterRing: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.8)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  countdownBubble: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderWidth: 2,
-    borderColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
+  shutterInner: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#fff',
   },
-  countdownText: { color: '#fff', fontSize: 36, lineHeight: 44 },
   captureFlash: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#fff',
@@ -467,22 +426,21 @@ const styles = StyleSheet.create({
   },
   retryContainer: {
     position: 'absolute',
-    bottom: '12%',
+    bottom: '8%',
     left: 0,
     right: 0,
     alignItems: 'center',
   },
   retryButton: {
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderWidth: 1.5,
-    borderColor: '#fff',
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+    borderRadius: 9999,
+    backgroundColor: '#fff',
   },
   retryText: {
-    color: '#fff',
+    color: '#000',
     fontSize: 15,
+    fontWeight: '600',
     textAlign: 'center',
   },
 });

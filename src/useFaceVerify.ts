@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { Camera } from 'react-native-vision-camera';
 import { compareFacesWithRekognition } from './awsRekognition';
-import { checkImageQuality } from './FaceVerifyModule';
 import type {
   AwsConfig,
   EndpointConfig,
@@ -14,7 +13,6 @@ type Options = {
   referenceImage: string;
   awsConfig?: AwsConfig;
   endpoint?: EndpointConfig;
-  countdownFrom: number;
   soundEnabled: boolean;
   cameraRef: React.RefObject<Camera | null>;
   onMatch: (result: VerifyResult) => void;
@@ -23,7 +21,6 @@ type Options = {
 };
 
 // ─── Base64 helper ─────────────────────────────────────────────────────────────
-// Converts a photo file path to raw base64 via FileReader (Hermes / RN 0.71+).
 async function photoToBase64(path: string): Promise<string> {
   const response = await fetch(`file://${path}`);
   const blob = await response.blob();
@@ -80,7 +77,6 @@ export function useFaceVerify(options: Options) {
     referenceImage,
     awsConfig,
     endpoint,
-    countdownFrom,
     soundEnabled,
     cameraRef,
     onMatch,
@@ -93,7 +89,6 @@ export function useFaceVerify(options: Options) {
   const [feedback, setFeedback] = useState<FeedbackMessage>(
     'Position your face in the circle'
   );
-  const [countdown, setCountdown] = useState<number | null>(null);
 
   const stateRef = useRef<FaceVerifyState>('ready');
   const isCaptured = useRef(false);
@@ -103,9 +98,17 @@ export function useFaceVerify(options: Options) {
     setFaceVerifyState(next);
   }, []);
 
-  // ── Capture + quality check + compare ────────────────────────────────────────
+  // ── Capture → compare ─────────────────────────────────────────────────────────
   const capture = useCallback(async () => {
     if (isCaptured.current || !cameraRef.current) return;
+    if (
+      stateRef.current === 'capturing' ||
+      stateRef.current === 'comparing' ||
+      stateRef.current === 'match' ||
+      stateRef.current === 'no_match'
+    )
+      return;
+
     isCaptured.current = true;
     setState('capturing');
 
@@ -115,24 +118,9 @@ export function useFaceVerify(options: Options) {
         enableShutterSound: soundEnabled,
       });
 
-      // Quality check on the captured photo
       setState('comparing');
       setFeedback('Verifying identity...');
 
-      const quality = await checkImageQuality(photo.path);
-
-      if (!quality.passed) {
-        setState('error');
-        setFeedback('');
-        onError?.(
-          new Error(
-            `[FaceVerify] Quality check failed — reason: ${quality.reason ?? 'unknown'}, sharpness: ${quality.sharpness?.toFixed(1) ?? 'n/a'}, brightness: ${quality.brightness?.toFixed(1) ?? 'n/a'}`
-          )
-        );
-        return;
-      }
-
-      // Compare
       const capturedImage = await photoToBase64(photo.path);
       const { match, similarity } = await runComparison(
         referenceImage,
@@ -174,55 +162,13 @@ export function useFaceVerify(options: Options) {
     setState,
   ]);
 
-  // ── Countdown ─────────────────────────────────────────────────────────────────
-  // Defined with useRef so capture can reference it without stale closures.
-  const startCountdownRef = useRef<() => void>(() => {});
-
-  const startCountdown = useCallback(() => {
-    if (
-      stateRef.current === 'capturing' ||
-      stateRef.current === 'comparing' ||
-      stateRef.current === 'match' ||
-      stateRef.current === 'no_match' ||
-      stateRef.current === 'error'
-    )
-      return;
-
-    setFeedback('Hold still...');
-    let tick = countdownFrom;
-    setCountdown(tick);
-
-    const interval = setInterval(() => {
-      tick -= 1;
-      if (tick <= 0) {
-        clearInterval(interval);
-        setCountdown(null);
-        capture();
-      } else {
-        setCountdown(tick);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [capture, countdownFrom]);
-
-  // Keep ref in sync so capture() can call startCountdown() on retry
-  startCountdownRef.current = startCountdown;
-
-  // ── Auto-start: brief stabilisation then countdown ────────────────────────────
-  useEffect(() => {
-    const timer = setTimeout(() => startCountdownRef.current(), 1200);
-    return () => clearTimeout(timer);
-  }, []);
-
   // ── Retry after error ─────────────────────────────────────────────────────────
   const retry = useCallback(() => {
     if (stateRef.current !== 'error') return;
     isCaptured.current = false;
     setState('ready');
     setFeedback('Position your face in the circle');
-    setTimeout(() => startCountdownRef.current(), 800);
   }, [setState]);
 
-  return { faceVerifyState, feedback, countdown, retry };
+  return { faceVerifyState, feedback, capture, retry };
 }

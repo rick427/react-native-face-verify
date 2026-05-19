@@ -71,9 +71,6 @@ export type FaceVerifyProps = {
   /** Called on any unrecoverable error (camera or network). */
   onError?: (error: Error) => void;
 
-  /** Countdown start value before auto-capture. Defaults to 3. */
-  countdownFrom?: number;
-
   /** Whether to play a shutter sound on capture. Defaults to true. */
   soundEnabled?: boolean;
 

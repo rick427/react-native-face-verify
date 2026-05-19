@@ -4,7 +4,6 @@ export { useFaceVerify } from './useFaceVerify';
 export type {
   AwsConfig,
   EndpointConfig,
-  FaceData,
   FaceVerifyModalProps,
   FaceVerifyProps,
   FaceVerifyState,

@@ -1,42 +1,21 @@
 import type { ModalProps, ViewStyle } from 'react-native';
 
-export type FaceData = {
-  detected: boolean;
-  bounds: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-  frameWidth?: number;
-  frameHeight?: number;
-  yawAngle: number;
-  pitchAngle: number;
-  rollAngle: number;
-  leftEyeOpenProbability: number;
-  rightEyeOpenProbability: number;
-  /** Laplacian variance of the frame — higher = sharper image. */
-  sharpness: number;
-};
-
 export type FaceVerifyState =
-  | 'scanning'
-  | 'confirmed'
-  | 'countdown'
-  | 'capturing'
-  | 'comparing'
-  | 'match'
-  | 'no_match'
-  | 'error';
+  | 'ready'      // camera open, instructions shown, countdown running
+  | 'capturing'  // taking photo
+  | 'comparing'  // quality check + comparison call (same visual: ripple)
+  | 'match'      // same person confirmed
+  | 'no_match'   // different person or below threshold
+  | 'error';     // camera or network failure
 
 export type FeedbackMessage =
   | 'Position your face in the circle'
-  | 'Look straight ahead'
-  | 'Hold still'
-  | 'Quality confirmed'
+  | 'Hold still...'
   | 'Verifying identity...'
   | 'Identity verified'
   | 'Face not recognized'
+  | 'Image unclear, trying again...'
+  | 'Too dark — move to better lighting'
   | '';
 
 export type VerifyResult = {
@@ -70,7 +49,6 @@ export type FaceVerifyProps = {
    * Takes priority over `endpoint` if both are supplied.
    *
    * WARNING: Do not ship real IAM credentials in a public app.
-   * Use this only for internal / MDM-managed applications.
    */
   awsConfig?: AwsConfig;
 
@@ -89,7 +67,7 @@ export type FaceVerifyProps = {
   /** Called when the faces do not match or the service returns no match. */
   onNoMatch: (result: VerifyResult) => void;
 
-  /** Called on any unrecoverable error (camera, network, config). */
+  /** Called on any unrecoverable error (camera or network). */
   onError?: (error: Error) => void;
 
   /** Countdown start value before auto-capture. Defaults to 3. */

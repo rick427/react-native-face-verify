@@ -16,9 +16,6 @@ Pod::Spec.new do |s|
   s.source_files = "ios/**/*.{h,m,mm,swift}"
   s.swift_version = "5.7"
 
-  # Vision Camera frame processor plugin
-  s.dependency "VisionCamera"
-
   # ML Kit Face Detection
   s.dependency "GoogleMLKit/FaceDetection", "~> 7.0"
 

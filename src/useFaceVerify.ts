@@ -1,20 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Camera, Frame } from 'react-native-vision-camera';
-import { runAtTargetFps, useFrameProcessor } from 'react-native-vision-camera';
-import { Worklets } from 'react-native-worklets-core';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Camera } from 'react-native-vision-camera';
 import { compareFacesWithRekognition } from './awsRekognition';
-import { useFaceVerifyPlugin } from './FaceVerifyDetector';
-import { QUALITY_STEPS } from './faceVerifyScoring';
+import { checkImageQuality } from './FaceVerifyModule';
 import type {
   AwsConfig,
   EndpointConfig,
-  FaceData,
   FaceVerifyState,
   FeedbackMessage,
   VerifyResult,
 } from './types';
-
-const TOTAL_STEPS = QUALITY_STEPS.length;
 
 type Options = {
   referenceImage: string;
@@ -28,16 +22,8 @@ type Options = {
   onError?: (error: Error) => void;
 };
 
-type FaceVerifyCameraState = {
-  faceVerifyState: FaceVerifyState;
-  qualityScore: number;
-  countdown: number | null;
-  feedback: FeedbackMessage;
-};
-
-// ─── Base64 helper ────────────────────────────────────────────────────────────
-// Reads a photo file path and returns raw base64 (no data URI prefix).
-// Uses FileReader which is available in Hermes (RN 0.71+).
+// ─── Base64 helper ─────────────────────────────────────────────────────────────
+// Converts a photo file path to raw base64 via FileReader (Hermes / RN 0.71+).
 async function photoToBase64(path: string): Promise<string> {
   const response = await fetch(`file://${path}`);
   const blob = await response.blob();
@@ -45,9 +31,7 @@ async function photoToBase64(path: string): Promise<string> {
     const reader = new FileReader();
     reader.onloadend = () => {
       if (typeof reader.result === 'string') {
-        // Strip the "data:image/jpeg;base64," prefix
-        const base64 = reader.result.split(',')[1] ?? reader.result;
-        resolve(base64);
+        resolve(reader.result.split(',')[1] ?? reader.result);
       } else {
         reject(new Error('FileReader result was not a string'));
       }
@@ -57,7 +41,7 @@ async function photoToBase64(path: string): Promise<string> {
   });
 }
 
-// ─── Comparison dispatcher ────────────────────────────────────────────────────
+// ─── Comparison dispatcher ─────────────────────────────────────────────────────
 async function runComparison(
   referenceImage: string,
   capturedImage: string,
@@ -67,31 +51,22 @@ async function runComparison(
   if (awsConfig) {
     return compareFacesWithRekognition(awsConfig, referenceImage, capturedImage);
   }
-
   if (endpoint) {
     const response = await fetch(endpoint.url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...endpoint.headers,
-      },
+      headers: { 'Content-Type': 'application/json', ...endpoint.headers },
       body: JSON.stringify({ referenceImage, capturedImage }),
     });
-
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`[FaceVerify] Endpoint error ${response.status}: ${text}`);
     }
-
     return response.json() as Promise<{ match: boolean; similarity: number }>;
   }
-
-  throw new Error(
-    '[FaceVerify] Either `awsConfig` or `endpoint` must be provided.'
-  );
+  throw new Error('[FaceVerify] Either `awsConfig` or `endpoint` must be provided.');
 }
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
+// ─── Hook ──────────────────────────────────────────────────────────────────────
 export function useFaceVerify(options: Options) {
   const {
     referenceImage,
@@ -105,218 +80,127 @@ export function useFaceVerify(options: Options) {
     onError,
   } = options;
 
-  const plugin = useFaceVerifyPlugin();
+  const [faceVerifyState, setFaceVerifyState] = useState<FaceVerifyState>('ready');
+  const [feedback, setFeedback] = useState<FeedbackMessage>(
+    'Position your face in the circle'
+  );
+  const [countdown, setCountdown] = useState<number | null>(null);
 
-  const currentStepIdx = useRef(0);
-  const stepFrameCount = useRef(0);
-  const stateRef = useRef<FaceVerifyState>('scanning');
+  const stateRef = useRef<FaceVerifyState>('ready');
   const isCaptured = useRef(false);
 
-  const [state, setState] = useState<FaceVerifyCameraState>({
-    faceVerifyState: 'scanning',
-    qualityScore: 0,
-    countdown: null,
-    feedback: QUALITY_STEPS[0]!.instruction,
-  });
-
-  const setVerifyState = useCallback((next: FaceVerifyState) => {
+  const setState = useCallback((next: FaceVerifyState) => {
     stateRef.current = next;
-    setState((prev) => ({ ...prev, faceVerifyState: next }));
+    setFaceVerifyState(next);
   }, []);
 
-  // ── Compare ────────────────────────────────────────────────────────────────
-  const compare = useCallback(
-    async (capturedPath: string) => {
-      setVerifyState('comparing');
-      setState((prev) => ({ ...prev, feedback: 'Verifying identity...' }));
-
-      try {
-        const capturedImage = await photoToBase64(capturedPath);
-        const { match, similarity } = await runComparison(
-          referenceImage,
-          capturedImage,
-          awsConfig,
-          endpoint
-        );
-
-        const result: VerifyResult = {
-          match,
-          similarity,
-          capturedImage,
-          timestamp: Date.now(),
-        };
-
-        if (match) {
-          setState((prev) => ({ ...prev, feedback: 'Identity verified' }));
-          setVerifyState('match');
-          onMatch(result);
-        } else {
-          setState((prev) => ({ ...prev, feedback: 'Face not recognized' }));
-          setVerifyState('no_match');
-          onNoMatch(result);
-        }
-      } catch (err) {
-        setVerifyState('error');
-        setState((prev) => ({ ...prev, feedback: '' }));
-        onError?.(err instanceof Error ? err : new Error(String(err)));
-      }
-    },
-    [referenceImage, awsConfig, endpoint, onMatch, onNoMatch, onError, setVerifyState]
-  );
-
-  // ── Capture ────────────────────────────────────────────────────────────────
+  // ── Capture + quality check + compare ────────────────────────────────────────
   const capture = useCallback(async () => {
     if (isCaptured.current || !cameraRef.current) return;
     isCaptured.current = true;
-    setVerifyState('capturing');
+    setState('capturing');
 
     try {
       const photo = await cameraRef.current.takePhoto({
         flash: 'off',
         enableShutterSound: soundEnabled,
       });
-      await compare(photo.path);
+
+      // Quality check on the captured photo
+      setState('comparing');
+      setFeedback('Verifying identity...');
+
+      const quality = await checkImageQuality(photo.path);
+
+      if (!quality.passed) {
+        // Image not usable — show reason and retry
+        const msg: FeedbackMessage =
+          quality.reason === 'too_dark'
+            ? 'Too dark — move to better lighting'
+            : 'Image unclear, trying again...';
+        setFeedback(msg);
+
+        setTimeout(() => {
+          isCaptured.current = false;
+          setState('ready');
+          setFeedback('Position your face in the circle');
+          startCountdown();
+        }, 2000);
+        return;
+      }
+
+      // Compare
+      const capturedImage = await photoToBase64(photo.path);
+      const { match, similarity } = await runComparison(
+        referenceImage,
+        capturedImage,
+        awsConfig,
+        endpoint
+      );
+
+      const result: VerifyResult = {
+        match,
+        similarity,
+        capturedImage,
+        timestamp: Date.now(),
+      };
+
+      if (match) {
+        setFeedback('Identity verified');
+        setState('match');
+        onMatch(result);
+      } else {
+        setFeedback('Face not recognized');
+        setState('no_match');
+        onNoMatch(result);
+      }
     } catch (err) {
-      setVerifyState('error');
+      setState('error');
+      setFeedback('');
       onError?.(err instanceof Error ? err : new Error(String(err)));
     }
-  }, [cameraRef, soundEnabled, compare, setVerifyState, onError]);
+  }, [cameraRef, soundEnabled, referenceImage, awsConfig, endpoint, onMatch, onNoMatch, onError, setState]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Countdown ──────────────────────────────────────────────────────────────
+  // ── Countdown ─────────────────────────────────────────────────────────────────
+  // Defined with useRef so capture can reference it without stale closures.
+  const startCountdownRef = useRef<() => void>(() => {});
+
   const startCountdown = useCallback(() => {
-    setVerifyState('countdown');
+    if (
+      stateRef.current === 'capturing' ||
+      stateRef.current === 'comparing' ||
+      stateRef.current === 'match' ||
+      stateRef.current === 'no_match' ||
+      stateRef.current === 'error'
+    )
+      return;
+
+    setFeedback('Hold still...');
     let tick = countdownFrom;
-    setState((prev) => ({ ...prev, countdown: tick }));
+    setCountdown(tick);
 
     const interval = setInterval(() => {
       tick -= 1;
       if (tick <= 0) {
         clearInterval(interval);
-        setState((prev) => ({ ...prev, countdown: null }));
+        setCountdown(null);
         capture();
       } else {
-        setState((prev) => ({ ...prev, countdown: tick }));
+        setCountdown(tick);
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [capture, countdownFrom, setVerifyState]);
+  }, [capture, countdownFrom]);
 
-  // ── Per-frame quality handler (JS thread, called from worklet) ─────────────
-  const handleFaceData = useCallback(
-    (face: FaceData | null, width: number) => {
-      const s = stateRef.current;
-      if (
-        s === 'confirmed' ||
-        s === 'countdown' ||
-        s === 'capturing' ||
-        s === 'comparing' ||
-        s === 'match' ||
-        s === 'no_match' ||
-        s === 'error'
-      )
-        return;
+  // Keep ref in sync so capture() can call startCountdown() on retry
+  startCountdownRef.current = startCountdown;
 
-      const safeFace: FaceData = face ?? {
-        detected: false,
-        bounds: { x: 0, y: 0, width: 0, height: 0 },
-        yawAngle: 0,
-        pitchAngle: 0,
-        rollAngle: 0,
-        leftEyeOpenProbability: -1,
-        rightEyeOpenProbability: -1,
-        sharpness: 0,
-      };
-
-      if (__DEV__) {
-        const ref = Math.min(
-          safeFace.frameWidth ?? width,
-          safeFace.frameHeight ?? width
-        );
-        const ratio = safeFace.detected
-          ? (safeFace.bounds.width / ref).toFixed(3)
-          : 'n/a';
-        console.log(
-          `[FaceVerify] step=${currentStepIdx.current}` +
-            ` detected=${safeFace.detected}` +
-            ` ratio=${ratio}` +
-            ` yaw=${safeFace.yawAngle.toFixed(1)}` +
-            ` sharpness=${safeFace.sharpness.toFixed(1)}`
-        );
-      }
-
-      const step = QUALITY_STEPS[currentStepIdx.current]!;
-      const stepMet = step.check(safeFace, width);
-
-      if (stepMet) {
-        stepFrameCount.current += 1;
-      } else {
-        stepFrameCount.current = Math.max(0, stepFrameCount.current - 1);
-      }
-
-      if (stepFrameCount.current >= step.framesRequired) {
-        stepFrameCount.current = 0;
-        const nextIdx = currentStepIdx.current + 1;
-
-        if (nextIdx >= TOTAL_STEPS) {
-          setState((prev) => ({
-            ...prev,
-            qualityScore: 1,
-            feedback: 'Quality confirmed',
-          }));
-          setVerifyState('confirmed');
-          startCountdown();
-        } else {
-          currentStepIdx.current = nextIdx;
-          setState((prev) => ({
-            ...prev,
-            qualityScore: nextIdx / TOTAL_STEPS,
-            feedback: QUALITY_STEPS[nextIdx]!.instruction,
-          }));
-        }
-        return;
-      }
-
-      const progress =
-        (currentStepIdx.current +
-          stepFrameCount.current / step.framesRequired) /
-        TOTAL_STEPS;
-      setState((prev) => ({ ...prev, qualityScore: progress }));
-    },
-    [setVerifyState, startCountdown]
-  );
-
-  // ── Frame processor ────────────────────────────────────────────────────────
-  const handleFaceDataJS = useMemo(
-    () => Worklets.createRunOnJS(handleFaceData),
-    [handleFaceData]
-  );
-
-  const frameProcessor = useFrameProcessor(
-    (frame: Frame) => {
-      'worklet';
-      runAtTargetFps(20, () => {
-        'worklet';
-        const face = plugin.detectFaceQuality(frame);
-        handleFaceDataJS(face, frame.width);
-      });
-    },
-    [plugin, handleFaceDataJS]
-  );
-
+  // ── Auto-start: brief stabilisation then countdown ────────────────────────────
   useEffect(() => {
-    return () => {
-      currentStepIdx.current = 0;
-      stepFrameCount.current = 0;
-      isCaptured.current = false;
-    };
-  }, []);
+    const timer = setTimeout(() => startCountdownRef.current(), 1200);
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return {
-    frameProcessor,
-    faceVerifyState: state.faceVerifyState,
-    qualityScore: state.qualityScore,
-    countdown: state.countdown,
-    feedback: state.feedback,
-  };
+  return { faceVerifyState, feedback, countdown };
 }

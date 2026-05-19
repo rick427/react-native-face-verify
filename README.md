@@ -7,9 +7,9 @@
 [![vision camera](https://img.shields.io/badge/vision--camera-v4-blue?style=flat-square)](https://github.com/mrousavy/react-native-vision-camera)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-Face verification library for React Native. Opens the front camera, runs real-time ML Kit quality checks, auto-captures when the image is sharp and well-positioned, then compares the capture against a reference image via **AWS Rekognition** or **your own backend endpoint**.
+Face verification library for React Native. Opens the front camera, auto-captures after a countdown, runs native ML Kit quality checks on the captured photo, then compares it against a reference image via **AWS Rekognition** or **your own backend endpoint**.
 
-Same design language as [`@rick427/react-native-liveness`](https://github.com/rick427/react-native-liveness) — SVG circle overlay, rotating corner brackets, progress arc, countdown bubble.
+Same design language as [`@rick427/react-native-liveness`](https://github.com/rick427/react-native-liveness) — SVG circle overlay, rotating corner brackets, ripple pulse animation, countdown bubble.
 
 ---
 
@@ -17,21 +17,27 @@ Same design language as [`@rick427/react-native-liveness`](https://github.com/ri
 
 ```
 Camera opens (front)
-  → Frame processor runs ML Kit quality checks at 20fps
-  → Arc fills as quality builds (white → yellow → green)
-  → Quality confirmed → countdown (3-2-1) → auto-capture
-  → White border + ripple pulse animation (comparison in progress)
+  → 1.2 s stabilisation delay
+  → Countdown (3 → 2 → 1)
+  → Auto-capture (takePhoto)
+  → Native quality check: brightness + sharpness + face detection
+      ↳ Too dark  → reset, show feedback, retry countdown
+      ↳ Blurry    → reset, show feedback, retry countdown
+  → Convert photo to base64
+  → Compare via endpoint or AWS Rekognition
+  → White ripple during comparison
   → Green border  →  onMatch()    (same person)
   → Red border    →  onNoMatch()  (different person / no match)
 ```
 
-**Quality gates (3 steps)**
+**Quality checks (on captured photo)**
 
-| Step | Check | Frames required |
+| Check | Threshold | Reject reason |
 |---|---|---|
-| 1 | Face detected | 3 |
-| 2 | Correct size + looking straight + eyes open | 5 |
-| 3 | Image sharp enough (Laplacian variance ≥ 80) | 5 |
+| Average luminance | < 40 | `too_dark` |
+| Laplacian variance (sharpness) | < 60 | `blurry` |
+| ML Kit face present | no face | `no_face` |
+| Head pose (yaw/pitch) | > 25° | `bad_pose` |
 
 ---
 
@@ -48,8 +54,7 @@ Install these if not already present:
 ```sh
 yarn add react-native-vision-camera \
          react-native-reanimated \
-         react-native-svg \
-         react-native-worklets-core
+         react-native-svg
 ```
 
 ### iOS
@@ -134,17 +139,16 @@ import { FaceVerify } from '@rick427/react-native-face-verify';
 ```tsx
 import { useFaceVerify } from '@rick427/react-native-face-verify';
 
-const { frameProcessor, faceVerifyState, qualityScore, countdown, feedback } =
-  useFaceVerify({
-    referenceImage,
-    endpoint: { url: 'https://api.example.com/compare' },
-    countdownFrom: 3,
-    soundEnabled: true,
-    cameraRef,
-    onMatch,
-    onNoMatch,
-    onError,
-  });
+const { faceVerifyState, feedback, countdown } = useFaceVerify({
+  referenceImage,
+  endpoint: { url: 'https://api.example.com/compare' },
+  countdownFrom: 3,
+  soundEnabled: true,
+  cameraRef,
+  onMatch,
+  onNoMatch,
+  onError,
+});
 ```
 
 ---
@@ -261,11 +265,9 @@ type AwsConfig = {
 
 | State | Border colour | Description |
 |---|---|---|
-| `scanning` | White → Yellow | Frame processor running, quality arc filling |
-| `confirmed` | Green | All 3 quality steps passed |
-| `countdown` | Green | Counting down to auto-capture |
-| `capturing` | Green | Taking photo |
-| `comparing` | White + ripple | Comparison request in flight |
+| `ready` | White | Camera open, countdown running |
+| `capturing` | White | Taking photo (brief flash) |
+| `comparing` | White + ripple pulse | Quality check + comparison in flight |
 | `match` | Green | Same person confirmed |
 | `no_match` | Red | Different person or below threshold |
 | `error` | Red | Camera, network, or config failure |
@@ -274,13 +276,13 @@ type AwsConfig = {
 
 ## Native modules
 
-The library registers a Vision Camera frame processor plugin named `detectFaceQuality` on both platforms.
+Quality checks run natively on the **captured photo** — not on every camera frame — so no frame processor or worklets are needed.
 
-**iOS:** `FaceVerifyPlugin.swift` — ML Kit FaceDetector (fast mode, classification enabled) + Laplacian variance on the pixel buffer luma channel.
+**iOS:** `FaceVerifyModule.swift` — computes average luma (brightness), Laplacian variance (sharpness) on the captured UIImage, then runs ML Kit FaceDetector for face presence and head-pose check.
 
-**Android:** `FaceVerifyPlugin.kt` — same via ML Kit + Laplacian variance on the `ImageProxy` Y plane.
+**Android:** `FaceVerifyModule.kt` — same logic via BitmapFactory + ML Kit FaceDetector.
 
-The sharpness score (Laplacian variance) is computed by sampling every 8th pixel for performance. A score ≥ 80 passes the sharpness gate.
+Both platforms resolve a promise with `{ passed: boolean, reason?: string }` which `useFaceVerify` uses to decide whether to retry the countdown or proceed with the comparison.
 
 ---
 

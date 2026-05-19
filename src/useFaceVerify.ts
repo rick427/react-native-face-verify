@@ -21,20 +21,28 @@ type Options = {
 };
 
 // ─── Base64 helper ─────────────────────────────────────────────────────────────
-async function photoToBase64(path: string): Promise<string> {
-  const response = await fetch(`file://${path}`);
-  const blob = await response.blob();
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result.split(',')[1] ?? reader.result);
-      } else {
-        reject(new Error('FileReader result was not a string'));
-      }
+function photoToBase64(path: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', `file://${path}`, true);
+    xhr.responseType = 'blob';
+    xhr.onload = () => {
+      const blob: Blob = xhr.response;
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result.split(',')[1] ?? reader.result);
+        } else {
+          reject(new Error('[FaceVerify] Could not read captured photo.'));
+        }
+      };
+      reader.onerror = () =>
+        reject(new Error('[FaceVerify] Could not read captured photo.'));
+      reader.readAsDataURL(blob);
     };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
+    xhr.onerror = () =>
+      reject(new Error('[FaceVerify] Could not load photo from disk.'));
+    xhr.send();
   });
 }
 
@@ -46,15 +54,22 @@ async function runComparison(
   endpoint?: EndpointConfig
 ): Promise<{ match: boolean; similarity: number }> {
   if (endpoint) {
-    const response = await fetch(endpoint.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...endpoint.headers },
-      body: JSON.stringify({ referenceImage, capturedImage }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(endpoint.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...endpoint.headers },
+        body: JSON.stringify({ referenceImage, capturedImage }),
+      });
+    } catch (err) {
+      throw new Error(
+        `[FaceVerify] Could not reach endpoint "${endpoint.url}". Check the URL, internet connection, and that the server allows HTTP (not just HTTPS). Original: ${String(err)}`
+      );
+    }
     if (!response.ok) {
       const text = await response.text();
       throw new Error(
-        `[FaceVerify] Endpoint error ${response.status}: ${text}`
+        `[FaceVerify] Endpoint ${response.status} at "${endpoint.url}": ${text}`
       );
     }
     return response.json() as Promise<{ match: boolean; similarity: number }>;

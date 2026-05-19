@@ -126,7 +126,7 @@ export function useFaceVerify(options: Options) {
         setFeedback('');
         onError?.(
           new Error(
-            `[FaceVerify] Image quality check failed: ${quality.reason ?? 'unknown'}`
+            `[FaceVerify] Quality check failed — reason: ${quality.reason ?? 'unknown'}, sharpness: ${quality.sharpness?.toFixed(1) ?? 'n/a'}, brightness: ${quality.brightness?.toFixed(1) ?? 'n/a'}`
           )
         );
         return;

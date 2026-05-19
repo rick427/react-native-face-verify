@@ -47,9 +47,9 @@ class FaceVerifyModule(reactContext: ReactApplicationContext) :
           return@Thread
         }
 
-        // Sharpness — reject blurry captures
+        // Sharpness — reject severely blurry captures
         val sharpness = laplacianVariance(bitmap)
-        if (sharpness < 60.0) {
+        if (sharpness < 15.0) {
           promise.resolve(result(passed = false, reason = "blurry", sharpness = sharpness))
           return@Thread
         }
@@ -64,8 +64,8 @@ class FaceVerifyModule(reactContext: ReactApplicationContext) :
         }
 
         val face = faces.first()
-        if (abs(face.headEulerAngleY.toDouble()) > 25 ||
-            abs(face.headEulerAngleX.toDouble()) > 25) {
+        if (abs(face.headEulerAngleY.toDouble()) > 40 ||
+            abs(face.headEulerAngleX.toDouble()) > 40) {
           promise.resolve(result(passed = false, reason = "bad_pose"))
           return@Thread
         }

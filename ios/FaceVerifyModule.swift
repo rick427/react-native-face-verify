@@ -38,9 +38,9 @@ class FaceVerifyModule: NSObject {
         return
       }
 
-      // Sharpness — reject blurry frames
+      // Sharpness — reject severely blurry captures
       let sharpness = self.laplacianVariance(image)
-      if sharpness < 60 {
+      if sharpness < 15 {
         resolve(["passed": false, "reason": "blurry", "sharpness": sharpness])
         return
       }
@@ -56,7 +56,7 @@ class FaceVerifyModule: NSObject {
           return
         }
 
-        if abs(face.headEulerAngleY) > 25 || abs(face.headEulerAngleX) > 25 {
+        if abs(face.headEulerAngleY) > 40 || abs(face.headEulerAngleX) > 40 {
           resolve(["passed": false, "reason": "bad_pose"])
           return
         }

@@ -31,7 +31,7 @@ const AnimatedG = Animated.createAnimatedComponent(G);
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DEFAULT_FONT = 'Baloo-Medium';
-const CIRCLE_DIAMETER_RATIO = 0.82;
+const CIRCLE_DIAMETER_RATIO = 0.88;
 const STROKE_WIDTH = 3;
 const K = 0.5523;
 const BRACKET_SPAN_DEG = 44;

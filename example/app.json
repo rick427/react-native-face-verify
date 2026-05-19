@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "FaceVerifyExample",
+    "slug": "face-verify-example",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0F0F0F"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rick427.faceverifyexample",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Required for face verification",
+        "NSPhotoLibraryUsageDescription": "Required to pick a reference photo"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0F0F0F"
+      },
+      "package": "com.rick427.faceverifyexample"
+    },
+    "plugins": [
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "FaceVerify needs camera access to verify your identity"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FaceVerify needs access to your photos to pick a reference image"
+        }
+      ]
+    ]
+  }
+}

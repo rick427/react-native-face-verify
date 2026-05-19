@@ -46,17 +46,14 @@ function amzDate(): { amzDate: string; dateStamp: string } {
   const now = new Date();
   const iso = now.toISOString().replace(/[-:]/g, '');
   return {
-    amzDate: iso.slice(0, 15) + 'Z',  // YYYYMMDDTHHMMSSZ
-    dateStamp: iso.slice(0, 8),        // YYYYMMDD
+    amzDate: iso.slice(0, 15) + 'Z', // YYYYMMDDTHHMMSSZ
+    dateStamp: iso.slice(0, 8), // YYYYMMDD
   };
 }
 
 // ─── AWS Sig V4 signed fetch ──────────────────────────────────────────────────
 
-async function signedFetch(
-  config: AwsConfig,
-  body: string
-): Promise<Response> {
+async function signedFetch(config: AwsConfig, body: string): Promise<Response> {
   const { accessKeyId, secretAccessKey, region } = config;
   const host = `rekognition.${region}.amazonaws.com`;
   const url = `https://${host}/`;
@@ -70,15 +67,14 @@ async function signedFetch(
     `x-amz-date:${xAmzDate}`,
     `x-amz-target:RekognitionService.CompareFaces`,
   ].join('\n');
-  const signedHeaders =
-    'content-type;host;x-amz-date;x-amz-target';
+  const signedHeaders = 'content-type;host;x-amz-date;x-amz-target';
 
   const canonicalRequest = [
     'POST',
     '/',
-    '',                  // no query string
+    '', // no query string
     canonicalHeaders,
-    '',                  // blank line after headers
+    '', // blank line after headers
     signedHeaders,
     payloadHash,
   ].join('\n');
@@ -102,10 +98,10 @@ async function signedFetch(
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-amz-json-1.1',
-      Host: host,
+      'Host': host,
       'X-Amz-Date': xAmzDate,
       'X-Amz-Target': 'RekognitionService.CompareFaces',
-      Authorization: authorization,
+      'Authorization': authorization,
     },
     body,
   });

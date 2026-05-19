@@ -103,7 +103,10 @@ function CircleOverlay({
   const makeRippleProps = (sv: typeof ripple1) =>
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useAnimatedProps(
-      () => ({ r: r + sv.value * RIPPLE_EXPAND, opacity: (1 - sv.value) * 0.65 }),
+      () => ({
+        r: r + sv.value * RIPPLE_EXPAND,
+        opacity: (1 - sv.value) * 0.65,
+      }),
       [r, sv]
     );
 
@@ -136,7 +139,10 @@ function CircleOverlay({
         sv.value = withDelay(
           i * RIPPLE_STAGGER,
           withRepeat(
-            withTiming(1, { duration: RIPPLE_DURATION, easing: Easing.out(Easing.quad) }),
+            withTiming(1, {
+              duration: RIPPLE_DURATION,
+              easing: Easing.out(Easing.quad),
+            }),
             -1,
             false
           )
@@ -165,12 +171,40 @@ function CircleOverlay({
       <Path d={scrimD} fill="rgba(0,0,0,0.55)" fillRule="evenodd" />
 
       {/* Dim base ring */}
-      <Circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth={1} />
+      <Circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill="none"
+        stroke="rgba(255,255,255,0.18)"
+        strokeWidth={1}
+      />
 
       {/* Ripple rings — expand outward during 'comparing' */}
-      <AnimatedCircle cx={cx} cy={cy} fill="none" stroke="#FFFFFF" strokeWidth={STROKE_WIDTH} animatedProps={rp1} />
-      <AnimatedCircle cx={cx} cy={cy} fill="none" stroke="#FFFFFF" strokeWidth={STROKE_WIDTH} animatedProps={rp2} />
-      <AnimatedCircle cx={cx} cy={cy} fill="none" stroke="#FFFFFF" strokeWidth={STROKE_WIDTH} animatedProps={rp3} />
+      <AnimatedCircle
+        cx={cx}
+        cy={cy}
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth={STROKE_WIDTH}
+        animatedProps={rp1}
+      />
+      <AnimatedCircle
+        cx={cx}
+        cy={cy}
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth={STROKE_WIDTH}
+        animatedProps={rp2}
+      />
+      <AnimatedCircle
+        cx={cx}
+        cy={cy}
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth={STROKE_WIDTH}
+        animatedProps={rp3}
+      />
 
       {/* Rotating corner brackets */}
       <AnimatedG animatedProps={bracketAnimProps}>
@@ -198,25 +232,51 @@ function CircleOverlay({
 }
 
 // ─── CountdownBubble ──────────────────────────────────────────────────────────
-function CountdownBubble({ value, fontFamily }: { value: number; fontFamily: string }) {
+function CountdownBubble({
+  value,
+  fontFamily,
+}: {
+  value: number;
+  fontFamily: string;
+}) {
   const scale = useRef(new RNAnimated.Value(0)).current;
   const opacity = useRef(new RNAnimated.Value(0)).current;
 
   useEffect(() => {
     RNAnimated.parallel([
       RNAnimated.sequence([
-        RNAnimated.spring(scale, { toValue: 1.2, stiffness: 200, damping: 6, useNativeDriver: true }),
-        RNAnimated.spring(scale, { toValue: 1.0, stiffness: 150, damping: 8, useNativeDriver: true }),
+        RNAnimated.spring(scale, {
+          toValue: 1.2,
+          stiffness: 200,
+          damping: 6,
+          useNativeDriver: true,
+        }),
+        RNAnimated.spring(scale, {
+          toValue: 1.0,
+          stiffness: 150,
+          damping: 8,
+          useNativeDriver: true,
+        }),
       ]),
-      RNAnimated.timing(opacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+      RNAnimated.timing(opacity, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
     ]).start();
     return () => {
-      RNAnimated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+      RNAnimated.timing(opacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <RNAnimated.View style={[styles.countdownBubble, { opacity, transform: [{ scale }] }]}>
+    <RNAnimated.View
+      style={[styles.countdownBubble, { opacity, transform: [{ scale }] }]}
+    >
       <Text style={[styles.countdownText, { fontFamily }]}>{value}</Text>
     </RNAnimated.View>
   );
@@ -264,14 +324,18 @@ export function FaceVerify({
 
   useEffect(() => {
     if (!hasPermission) {
-      requestPermission().catch(() => onError?.(new Error('Camera permission denied')));
+      requestPermission().catch(() =>
+        onError?.(new Error('Camera permission denied'))
+      );
     }
   }, [hasPermission, requestPermission, onError]);
 
   if (!hasPermission) {
     return (
       <View style={[styles.root, style, styles.centered]}>
-        <Text style={[styles.permissionText, { fontFamily }]}>Camera permission required</Text>
+        <Text style={[styles.permissionText, { fontFamily }]}>
+          Camera permission required
+        </Text>
       </View>
     );
   }
@@ -279,7 +343,9 @@ export function FaceVerify({
   if (!device) {
     return (
       <View style={[styles.root, style, styles.centered]}>
-        <Text style={[styles.permissionText, { fontFamily }]}>No front camera found</Text>
+        <Text style={[styles.permissionText, { fontFamily }]}>
+          No front camera found
+        </Text>
       </View>
     );
   }
@@ -306,14 +372,22 @@ export function FaceVerify({
         height={containerSize.height}
         state={faceVerifyState}
       />
-      {faceVerifyState !== 'capturing' && faceVerifyState !== 'comparing' && feedback.length > 0 && (
-        <View style={styles.feedbackContainer}>
-          <Text style={[styles.feedbackText, { fontFamily }]}>{feedback}</Text>
-        </View>
-      )}
+      {faceVerifyState !== 'capturing' &&
+        faceVerifyState !== 'comparing' &&
+        feedback.length > 0 && (
+          <View style={styles.feedbackContainer}>
+            <Text style={[styles.feedbackText, { fontFamily }]}>
+              {feedback}
+            </Text>
+          </View>
+        )}
       {faceVerifyState === 'ready' && countdown !== null && (
         <View style={styles.countdownContainer}>
-          <CountdownBubble key={countdown} value={countdown} fontFamily={fontFamily} />
+          <CountdownBubble
+            key={countdown}
+            value={countdown}
+            fontFamily={fontFamily}
+          />
         </View>
       )}
       {faceVerifyState === 'capturing' && (
@@ -327,7 +401,12 @@ export function FaceVerify({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000', overflow: 'hidden' },
   centered: { justifyContent: 'center', alignItems: 'center' },
-  permissionText: { color: '#fff', fontSize: 16, textAlign: 'center', paddingHorizontal: 24 },
+  permissionText: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+  },
   feedbackContainer: {
     position: 'absolute',
     bottom: '12%',
@@ -360,5 +439,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   countdownText: { color: '#fff', fontSize: 52, lineHeight: 60 },
-  captureFlash: { ...StyleSheet.absoluteFillObject, backgroundColor: '#fff', opacity: 0.4 },
+  captureFlash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#fff',
+    opacity: 0.4,
+  },
 });

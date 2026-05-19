@@ -127,7 +127,10 @@ export default function App() {
         Pick a reference photo, then verify against the front camera.
       </Text>
 
-      <TouchableOpacity style={styles.secondaryButton} onPress={pickReferenceImage}>
+      <TouchableOpacity
+        style={styles.secondaryButton}
+        onPress={pickReferenceImage}
+      >
         <Text style={styles.secondaryButtonText}>
           {referenceImage ? 'Change Reference Photo' : 'Pick Reference Photo'}
         </Text>

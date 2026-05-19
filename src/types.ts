@@ -1,12 +1,12 @@
 import type { ModalProps, ViewStyle } from 'react-native';
 
 export type FaceVerifyState =
-  | 'ready'      // camera open, instructions shown, countdown running
-  | 'capturing'  // taking photo
-  | 'comparing'  // quality check + comparison call (same visual: ripple)
-  | 'match'      // same person confirmed
-  | 'no_match'   // different person or below threshold
-  | 'error';     // camera or network failure
+  | 'ready' // camera open, instructions shown, countdown running
+  | 'capturing' // taking photo
+  | 'comparing' // quality check + comparison call (same visual: ripple)
+  | 'match' // same person confirmed
+  | 'no_match' // different person or below threshold
+  | 'error'; // camera or network failure
 
 export type FeedbackMessage =
   | 'Position your face in the circle'

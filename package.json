@@ -1,6 +1,6 @@
 {
   "name": "@rick427/react-native-face-verify",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Face verification library for React Native — compares a reference image against a live front-camera capture using ML Kit quality checks and AWS Rekognition or a custom endpoint",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",

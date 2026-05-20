@@ -79,6 +79,7 @@ export function useFaceVerify(options: Options) {
   const [feedback, setFeedback] = useState<FeedbackMessage>(
     'Position your face in the circle'
   );
+  const [errorMessage, setErrorMessage] = useState('');
 
   const stateRef = useRef<FaceVerifyState>('ready');
   const isCaptured = useRef(false);
@@ -136,9 +137,11 @@ export function useFaceVerify(options: Options) {
         onNoMatch(result);
       }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       setState('error');
       setFeedback('');
-      onError?.(err instanceof Error ? err : new Error(String(err)));
+      setErrorMessage(msg);
+      onError?.(err instanceof Error ? err : new Error(msg));
     }
   }, [
     cameraRef,
@@ -158,7 +161,8 @@ export function useFaceVerify(options: Options) {
     isCaptured.current = false;
     setState('ready');
     setFeedback('Position your face in the circle');
+    setErrorMessage('');
   }, [setState]);
 
-  return { faceVerifyState, feedback, capture, retry };
+  return { faceVerifyState, feedback, errorMessage, capture, retry };
 }

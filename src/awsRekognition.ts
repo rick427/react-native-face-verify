@@ -220,6 +220,12 @@ export type RekognitionResult = {
   similarity: number;
 };
 
+/** Strip optional data URI prefix — Rekognition needs raw base64. */
+function stripDataUri(s: string): string {
+  const i = s.indexOf(',');
+  return i !== -1 ? s.slice(i + 1) : s;
+}
+
 /**
  * Calls AWS Rekognition CompareFaces using pure-JS AWS Signature V4 signing.
  * No AWS SDK, no Web Crypto — works on any React Native / Hermes version.
@@ -231,9 +237,21 @@ export async function compareFacesWithRekognition(
 ): Promise<RekognitionResult> {
   const threshold = config.similarityThreshold ?? 80;
 
+  const src = stripDataUri(sourceBase64);
+  const tgt = stripDataUri(targetBase64);
+
+  if (!src) {
+    throw new Error(
+      '[FaceVerify] Reference image is empty. Make sure referenceImage is a valid base64 string.'
+    );
+  }
+  if (!tgt) {
+    throw new Error('[FaceVerify] Captured image is empty.');
+  }
+
   const body = JSON.stringify({
-    SourceImage: { Bytes: sourceBase64 },
-    TargetImage: { Bytes: targetBase64 },
+    SourceImage: { Bytes: src },
+    TargetImage: { Bytes: tgt },
     SimilarityThreshold: threshold,
   });
 

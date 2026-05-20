@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
   useAnimatedProps,
+  useAnimatedStyle,
   useSharedValue,
   withDelay,
   withRepeat,
@@ -16,7 +17,6 @@ import {
   useCameraPermission,
 } from 'react-native-vision-camera';
 import { Circle, Defs, G, Path, Svg } from 'react-native-svg';
-import { useEffect } from 'react';
 import { useFaceVerify } from './useFaceVerify';
 import type { FaceVerifyProps, FaceVerifyState } from './types';
 
@@ -34,6 +34,7 @@ const BRACKET_STROKE = STROKE_WIDTH + 1;
 const RIPPLE_EXPAND = 44;
 const RIPPLE_DURATION = 1800;
 const RIPPLE_STAGGER = 600;
+const ERROR_DISMISS_MS = 5000;
 
 // ─── Colour helper ────────────────────────────────────────────────────────────
 function getCircleColor(state: FaceVerifyState): string {
@@ -73,6 +74,84 @@ function bracketArcPath(
   return (
     `M ${cx + r * Math.cos(a1)} ${cy + r * Math.sin(a1)} ` +
     `A ${r} ${r} 0 0 1 ${cx + r * Math.cos(a2)} ${cy + r * Math.sin(a2)}`
+  );
+}
+
+// ─── ErrorCard ────────────────────────────────────────────────────────────────
+function ErrorCard({
+  message,
+  cardTop,
+  onDismiss,
+  fontFamily,
+}: {
+  message: string;
+  cardTop: number;
+  onDismiss: () => void;
+  fontFamily: string;
+}) {
+  const opacity = useSharedValue(0);
+  const ty = useSharedValue(20);
+  const progress = useSharedValue(1);
+  const trackWidth = useSharedValue(0);
+
+  useEffect(() => {
+    opacity.value = withTiming(1, { duration: 280 });
+    ty.value = withTiming(0, {
+      duration: 280,
+      easing: Easing.out(Easing.quad),
+    });
+    progress.value = withTiming(0, {
+      duration: ERROR_DISMISS_MS,
+      easing: Easing.linear,
+    });
+    const t = setTimeout(onDismiss, ERROR_DISMISS_MS);
+    return () => {
+      clearTimeout(t);
+      cancelAnimation(progress);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: ty.value }],
+  }));
+
+  const barStyle = useAnimatedStyle(() => ({
+    width: progress.value * trackWidth.value,
+  }));
+
+  const displayMsg = message
+    .replace(/^\[FaceVerify\]\s*/, '')
+    .replace(/\. Original:.*$/, '');
+
+  return (
+    <Animated.View style={[styles.errorCard, { top: cardTop }, cardStyle]}>
+      <View style={styles.errorCardHeader}>
+        <View style={styles.errorCardTitleRow}>
+          <View style={styles.errorDot} />
+          <Text style={[styles.errorCardTitle, { fontFamily }]}>
+            Verification failed
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={onDismiss}
+          hitSlop={{ top: 10, bottom: 10, left: 12, right: 8 }}
+        >
+          <Text style={styles.errorCardX}>✕</Text>
+        </TouchableOpacity>
+      </View>
+      <Text style={[styles.errorCardMsg, { fontFamily }]} numberOfLines={2}>
+        {displayMsg}
+      </Text>
+      <View
+        style={styles.errorTrack}
+        onLayout={(e) => {
+          trackWidth.value = e.nativeEvent.layout.width;
+        }}
+      >
+        <Animated.View style={[styles.errorBar, barStyle]} />
+      </View>
+    </Animated.View>
   );
 }
 
@@ -130,10 +209,10 @@ function CircleOverlay({
     }
   }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Ripple — plays only during 'comparing'
+  // Ripples play during 'capturing' AND 'comparing' so loading feels instant
   useEffect(() => {
     const ripples = [ripple1, ripple2, ripple3];
-    if (state === 'comparing') {
+    if (state === 'capturing' || state === 'comparing') {
       ripples.forEach((sv, i) => {
         sv.value = 0;
         sv.value = withDelay(
@@ -163,6 +242,8 @@ function CircleOverlay({
     .map((deg) => bracketArcPath(cx, cy, r, deg, BRACKET_SPAN_DEG))
     .join(' ');
 
+  const showRipples = state === 'capturing' || state === 'comparing';
+
   return (
     <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
       <Defs />
@@ -180,8 +261,8 @@ function CircleOverlay({
         strokeWidth={1}
       />
 
-      {/* Ripple rings — only mounted during 'comparing' */}
-      {state === 'comparing' && (
+      {/* Ripple rings — visible during capturing + comparing */}
+      {showRipples && (
         <>
           <AnimatedCircle
             cx={cx}
@@ -253,17 +334,25 @@ export function FaceVerify({
   const fps = Math.min(format?.maxFps ?? 30, 60);
   const cameraRef = useState(() => ({ current: null as Camera | null }))[0];
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [showErrorCard, setShowErrorCard] = useState(false);
 
-  const { faceVerifyState, feedback, capture, retry } = useFaceVerify({
-    referenceImage,
-    awsConfig,
-    endpoint,
-    soundEnabled,
-    cameraRef: cameraRef as React.RefObject<Camera | null>,
-    onMatch,
-    onNoMatch,
-    onError,
-  });
+  const { faceVerifyState, feedback, errorMessage, capture, retry } =
+    useFaceVerify({
+      referenceImage,
+      awsConfig,
+      endpoint,
+      soundEnabled,
+      cameraRef: cameraRef as React.RefObject<Camera | null>,
+      onMatch,
+      onNoMatch,
+      onError,
+    });
+
+  // Show error card whenever we enter the error state
+  useEffect(() => {
+    if (faceVerifyState === 'error') setShowErrorCard(true);
+    else setShowErrorCard(false);
+  }, [faceVerifyState]);
 
   const handleLayout = useCallback(
     (e: { nativeEvent: { layout: { width: number; height: number } } }) => {
@@ -273,6 +362,11 @@ export function FaceVerify({
     []
   );
 
+  const handleRetry = useCallback(() => {
+    setShowErrorCard(false);
+    retry();
+  }, [retry]);
+
   useEffect(() => {
     if (!hasPermission) {
       requestPermission().catch(() =>
@@ -280,6 +374,14 @@ export function FaceVerify({
       );
     }
   }, [hasPermission, requestPermission, onError]);
+
+  // Position the error card just below the oval
+  const errorCardTop =
+    containerSize.height > 0
+      ? containerSize.height * 0.42 +
+        (containerSize.width * CIRCLE_DIAMETER_RATIO) / 2 +
+        20
+      : 0;
 
   if (!hasPermission) {
     return (
@@ -355,12 +457,22 @@ export function FaceVerify({
         <View style={styles.captureFlash} pointerEvents="none" />
       )}
 
-      {/* Retry button */}
+      {/* Error card — slides in below the oval, auto-dismisses */}
+      {faceVerifyState === 'error' && showErrorCard && errorMessage ? (
+        <ErrorCard
+          message={errorMessage}
+          cardTop={errorCardTop}
+          onDismiss={() => setShowErrorCard(false)}
+          fontFamily={fontFamily}
+        />
+      ) : null}
+
+      {/* Retry button — shown after error card has dismissed */}
       {faceVerifyState === 'error' && (
         <View style={styles.retryContainer}>
           <TouchableOpacity
             style={styles.retryButton}
-            onPress={retry}
+            onPress={handleRetry}
             activeOpacity={0.8}
           >
             <Text style={[styles.retryText, { fontFamily }]}>Try Again</Text>
@@ -424,6 +536,65 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     opacity: 0.4,
   },
+  // ─── Error card ──────────────────────────────────────────────────────────────
+  errorCard: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(12, 12, 14, 0.93)',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 59, 48, 0.35)',
+  },
+  errorCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  errorCardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  errorDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#FF3B30',
+  },
+  errorCardTitle: {
+    color: '#FF3B30',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  errorCardX: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  errorCardMsg: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  errorTrack: {
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 1,
+    overflow: 'hidden',
+  },
+  errorBar: {
+    height: 2,
+    backgroundColor: '#FF3B30',
+    borderRadius: 1,
+  },
+  // ─── Retry button ─────────────────────────────────────────────────────────────
   retryContainer: {
     position: 'absolute',
     bottom: '8%',

@@ -60,7 +60,8 @@
   },
   "homepage": "https://github.com/rick427/react-native-face-verify#readme",
   "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   },
   "devDependencies": {
     "@eslint/compat": "^2.0.3",

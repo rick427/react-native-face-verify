@@ -52,6 +52,11 @@ jobs:
       - name: Build
         run: yarn prepare
 
+      - name: Verify npm token
+        run: npm whoami
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Publish
         run: npm publish --access public
         env:

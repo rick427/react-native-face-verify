@@ -2,6 +2,8 @@ name: Publish to npm
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -57,7 +59,23 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Check if version already published
+        id: version_check
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if npm view @rick427/react-native-face-verify@$VERSION version 2>/dev/null | grep -q "$VERSION"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Version $VERSION is already on npm — skipping publish."
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "Version $VERSION is new — will publish."
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Publish
+        if: steps.version_check.outputs.skip == 'false'
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
